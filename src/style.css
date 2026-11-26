@@ -1,0 +1,681 @@
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: #090d16;
+  color: #f1f5f9;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  user-select: none;
+}
+
+@keyframes pulseGlow {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 25px rgba(16, 185, 129, 0.35); }
+  50% { transform: scale(1.04); box-shadow: 0 0 40px rgba(16, 185, 129, 0.6); }
+}
+
+.splash-logo {
+  animation: pulseGlow 2s infinite ease-in-out;
+}
+
+.grid-viewport::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.grid-viewport::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+
+.grid-viewport::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 3px;
+}
+
+.sheet-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+
+.corner-header {
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 40;
+  background: #1e293b;
+  border-right: 1px solid #334155;
+  border-bottom: 1px solid #334155;
+}
+
+.col-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: #1e293b;
+  color: #94a3b8;
+  font-weight: 600;
+  font-size: 12px;
+  border-right: 1px solid #334155;
+  border-bottom: 1px solid #334155;
+  text-align: center;
+  height: 28px;
+}
+
+.col-header.active-col {
+  background: #064e3b;
+  color: #34d399;
+  border-bottom: 2px solid #10b981;
+}
+
+.col-resizer {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 35;
+}
+
+.col-resizer:hover, .col-resizer.resizing {
+  background: #10b981;
+}
+
+.row-header {
+  position: sticky;
+  left: 0;
+  z-index: 25;
+  background: #1e293b;
+  color: #94a3b8;
+  font-weight: 600;
+  font-size: 11px;
+  border-right: 1px solid #334155;
+  border-bottom: 1px solid #334155;
+  text-align: center;
+  width: 44px;
+  min-width: 44px;
+}
+
+.row-header.active-row {
+  background: #064e3b;
+  color: #34d399;
+  border-right: 2px solid #10b981;
+}
+
+.freeze-row td.grid-cell {
+  position: sticky;
+  top: 28px;
+  z-index: 20;
+  background-color: #162032;
+  border-bottom: 2px solid #10b981 !important;
+}
+
+.freeze-col {
+  position: sticky;
+  left: 44px;
+  z-index: 19;
+  background-color: #162032;
+  border-right: 2px solid #10b981 !important;
+}
+
+.freeze-row td.freeze-col {
+  z-index: 22;
+}
+
+.grid-cell {
+  border-right: 1px solid #1e293b;
+  border-bottom: 1px solid #1e293b;
+  padding: 4px 6px;
+  font-size: 13px;
+  height: 32px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: #0f172a;
+  color: #f8fafc;
+  cursor: cell;
+}
+
+.grid-cell.in-range {
+  background-color: rgba(16, 185, 129, 0.14) !important;
+}
+
+.grid-cell.selected {
+  outline: 2px solid #10b981;
+  outline-offset: -2px;
+  z-index: 15;
+  position: relative;
+}
+
+.cell-editor-input {
+  width: 100%;
+  height: 100%;
+  background: #090d16;
+  color: #ffffff;
+  border: none;
+  outline: none;
+  font-family: inherit;
+  font-size: inherit;
+  padding: 0;
+  margin: 0;
+  user-select: text;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #printArea, #printArea * {
+    visibility: visible;
+  }
+  #printArea {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background: white !important;
+    color: black !important;
+    padding: 12px;
+  }
+  #printArea table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+  }
+  #printArea th, #printArea td {
+    border: 1px solid #cbd5e1 !important;
+    padding: 5px 6px !important;
+    color: #0f172a !important;
+  }
+  #printArea th {
+    background: #f1f5f9 !important;
+    font-weight: 700;
+  }
+}
+
+
+---
+
+### File 10: `src/app.js`
+**Where to create:** Inside `src/` folder (`src/app.js`)
+
+```javascript
+/**
+ * SHANKAR SHEETS — PRODUCTION APPLICATION LOGIC
+ * Includes Capacitor Android Back Button & Native Share Integration + Service Worker Registration
+ */
+
+const DB_NAME = 'ShankarSheetsDB';
+const DB_VERSION = 1;
+const STORE_NAME = 'workbooks';
+
+const DEFAULT_ROWS = 40;
+const DEFAULT_COLS = 15;
+const DEFAULT_COL_WIDTH = 104;
+
+function colIndexToLetter(index) {
+  let letter = '';
+  let temp = index;
+  while (temp >= 0) {
+    letter = String.fromCharCode((temp % 26) + 65) + letter;
+    temp = Math.floor(temp / 26) - 1;
+  }
+  return letter;
+}
+
+function letterToColIndex(letters) {
+  let col = 0;
+  const upper = letters.toUpperCase();
+  for (let i = 0; i < upper.length; i++) {
+    col = col * 26 + (upper.charCodeAt(i) - 64);
+  }
+  return col - 1;
+}
+
+function parseCellRef(ref) {
+  const match = /^([A-Za-z]+)(\d+)$/.exec(ref.trim());
+  if (!match) return null;
+  return {
+    col: letterToColIndex(match[1]),
+    row: parseInt(match[2], 10) - 1
+  };
+}
+
+function formatCellRef(row, col) {
+  return `${colIndexToLetter(col)}${row + 1}`;
+}
+
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.remove('opacity-0');
+  clearTimeout(window.__toastTimer);
+  window.__toastTimer = setTimeout(() => {
+    toast.classList.add('opacity-0');
+  }, 2500);
+}
+
+function openModal(id) {
+  document.getElementById(id).classList.remove('hidden');
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.add('hidden');
+}
+
+function showCustomDialog({ title, message, showInput = false, defaultValue = '', confirmText = 'Confirm', isDanger = false }) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('modalDialog');
+    const titleEl = document.getElementById('dialogTitle');
+    const msgEl = document.getElementById('dialogMessage');
+    const inputEl = document.getElementById('dialogInput');
+    const cancelBtn = document.getElementById('dialogCancel');
+    const confirmBtn = document.getElementById('dialogConfirm');
+
+    titleEl.textContent = title;
+    msgEl.textContent = message;
+    confirmBtn.textContent = confirmText;
+    confirmBtn.className = isDanger
+      ? 'px-4 py-2 rounded-xl bg-rose-600 text-white text-xs font-semibold'
+      : 'px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-semibold';
+
+    if (showInput) {
+      inputEl.classList.remove('hidden');
+      inputEl.value = defaultValue;
+    } else {
+      inputEl.classList.add('hidden');
+    }
+
+    modal.classList.remove('hidden');
+    if (showInput) setTimeout(() => inputEl.focus(), 50);
+
+    const cleanup = (result) => {
+      modal.classList.add('hidden');
+      cancelBtn.onclick = null;
+      confirmBtn.onclick = null;
+      resolve(result);
+    };
+
+    cancelBtn.onclick = () => cleanup(null);
+    confirmBtn.onclick = () => cleanup(showInput ? inputEl.value : true);
+  });
+}
+
+// ==================== INDEXEDDB STORAGE ====================
+const StorageEngine = {
+  db: null,
+  async init() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(DB_NAME, DB_VERSION);
+      request.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+        }
+      };
+      request.onsuccess = (e) => {
+        this.db = e.target.result;
+        resolve();
+      };
+      request.onerror = (e) => reject(e.target.error);
+    });
+  },
+  async getAllWorkbooks() {
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    });
+  },
+  async saveWorkbook(workbook) {
+    workbook.updatedAt = Date.now();
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.put(workbook);
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+  },
+  async deleteWorkbook(id) {
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.delete(id);
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+  }
+};
+
+// ==================== TEMPLATES ====================
+function createEmptySheet(name, rows = DEFAULT_ROWS, cols = DEFAULT_COLS) {
+  return {
+    id: 'sheet_' + Math.random().toString(36).slice(2, 9),
+    name,
+    rows,
+    cols,
+    colWidths: {},
+    colNames: {},
+    freezeRow: false,
+    freezeCol: false,
+    cells: {},
+    mergedChildren: {}
+  };
+}
+
+function seedSheetCells(sheet, matrix, headerStyle = true) {
+  matrix.forEach((rowArr, r) => {
+    rowArr.forEach((val, c) => {
+      if (val !== '' && val !== null && val !== undefined) {
+        const key = `${r}_${c}`;
+        sheet.cells[key] = {
+          raw: String(val),
+          style: r === 0 && headerStyle
+            ? { bold: true, bgColor: '#064e3b', color: '#ecfdf5', align: 'center', border: true }
+            : { border: true }
+        };
+      }
+    });
+  });
+}
+
+const TEMPLATES = [
+  {
+    id: 'daily_expense',
+    name: 'Daily Expense Sheet',
+    desc: 'Track daily spending with automatic SUM total',
+    build() {
+      const wb = { id: 'wb_' + Date.now(), name: 'Daily Expense Sheet', activeSheetIndex: 0, sheets: [] };
+      const s = createEmptySheet('Expenses', 35, 10);
+      s.freezeRow = true;
+      s.colWidths = { 0: 105, 1: 140, 2: 110, 3: 105, 4: 110 };
+      seedSheetCells(s, [
+        ['Date', 'Item / Description', 'Category', 'Payment Mode', 'Amount (₹)'],
+        ['2026-11-24', 'Morning Groceries & Milk', 'Food', 'UPI', '340'],
+        ['2026-11-24', 'Auto Rickshaw Fare', 'Transport', 'Cash', '120'],
+        ['2026-11-25', 'Mobile Recharge Plan', 'Utilities', 'UPI', '299'],
+        ['2026-11-25', 'Vegetables & Fruits', 'Food', 'Cash', '260'],
+        ['2026-11-26', 'Electricity Bill', 'Bills', 'NetBanking', '1450'],
+        ['', '', '', 'TOTAL SPENT', '=SUM(E2:E15)']
+      ]);
+      s.cells['6_3'].style = { bold: true, align: 'right', bgColor: '#1e293b', color: '#34d399', border: true };
+      s.cells['6_4'].style = { bold: true, format: 'currency', bgColor: '#064e3b', color: '#ffffff', border: true };
+      for (let r = 1; r <= 5; r++) s.cells[`${r}_4`].style.format = 'currency';
+      wb.sheets.push(s);
+      return wb;
+    }
+  },
+  {
+    id: 'income_expense',
+    name: 'Income & Expense Tracker',
+    desc: 'Net balance calculation with IF status check',
+    build() {
+      const wb = { id: 'wb_' + Date.now(), name: 'Income & Expense Tracker', activeSheetIndex: 0, sheets: [] };
+      const s = createEmptySheet('Cashflow', 35, 10);
+      s.freezeRow = true;
+      s.colWidths = { 0: 105, 1: 150, 2: 110, 3: 110, 4: 110 };
+      seedSheetCells(s, [
+        ['Date', 'Particulars', 'Income (₹)', 'Expense (₹)', 'Net Entry'],
+        ['2026-11-01', 'Monthly Salary', '45000', '0', '=C2-D2'],
+        ['2026-11-05', 'House Rent', '0', '12000', '=C3-D3'],
+        ['2026-11-10', 'Freelance Work', '8500', '0', '=C4-D4'],
+        ['2026-11-15', 'Supermarket & Ration', '0', '4200', '=C5-D5'],
+        ['', 'TOTALS', '=SUM(C2:C12)', '=SUM(D2:D12)', '=C6-D6'],
+        ['', 'SAVINGS STATUS', '=IF(E6>0,"SURPLUS","DEFICIT")', '', '']
+      ]);
+      wb.sheets.push(s);
+      return wb;
+    }
+  },
+  {
+    id: 'shop_stock',
+    name: 'Shop Stock Management',
+    desc: 'Inventory levels, stock value & low-stock alerts',
+    build() {
+      const wb = { id: 'wb_' + Date.now(), name: 'Shop Stock Inventory', activeSheetIndex: 0, sheets: [] };
+      const s = createEmptySheet('Inventory', 40, 10);
+      s.freezeRow = true;
+      s.colWidths = { 0: 90, 1: 150, 2: 85, 3: 95, 4: 115, 5: 110 };
+      seedSheetCells(s, [
+        ['Item Code', 'Product Name', 'Qty', 'Unit Price', 'Stock Value', 'Alert'],
+        ['ITM-01', 'Basmati Rice 5kg', '24', '420', '=C2*D2', '=IF(C2<10,"REORDER","OK")'],
+        ['ITM-02', 'Sunflower Oil 1L', '8', '145', '=C3*D3', '=IF(C3<10,"REORDER","OK")'],
+        ['ITM-03', 'Toor Dal 1kg', '19', '160', '=C4*D4', '=IF(C4<10,"REORDER","OK")'],
+        ['ITM-04', 'Sugar Pack 1kg', '6', '48', '=C5*D5', '=IF(C5<10,"REORDER","OK")'],
+        ['', 'TOTAL INVENTORY', '=SUM(C2:C15)', '', '=SUM(E2:E15)', '']
+      ]);
+      wb.sheets.push(s);
+      return wb;
+    }
+  },
+  {
+    id: 'customer_payments',
+    name: 'Customer Payment Record',
+    desc: 'Track billed amounts, paid dues & pending balance',
+    build() {
+      const wb = { id: 'wb_' + Date.now(), name: 'Customer Ledger', activeSheetIndex: 0, sheets: [] };
+      const s = createEmptySheet('Customers', 35, 10);
+      s.freezeRow = true;
+      s.colWidths = { 0: 140, 1: 110, 2: 110, 3: 110, 4: 110 };
+      seedSheetCells(s, [
+        ['Customer Name', 'Total Bill (₹)', 'Paid (₹)', 'Balance Due', 'Status'],
+        ['Ramesh Traders', '15000', '10000', '=B2-C2', '=IF(D2=0,"PAID","PENDING")'],
+        ['Suresh Electronics', '8400', '8400', '=B3-C3', '=IF(D3=0,"PAID","PENDING")'],
+        ['Anita General Store', '12500', '5000', '=B4-C4', '=IF(D4=0,"PAID","PENDING")'],
+        ['TOTAL RECEIVABLES', '=SUM(B2:B15)', '=SUM(C2:C15)', '=SUM(D2:D15)', '']
+      ]);
+      wb.sheets.push(s);
+      return wb;
+    }
+  },
+  {
+    id: 'attendance_sheet',
+    name: 'Attendance Sheet',
+    desc: 'Weekly staff attendance & present day counter',
+    build() {
+      const wb = { id: 'wb_' + Date.now(), name: 'Staff Attendance', activeSheetIndex: 0, sheets: [] };
+      const s = createEmptySheet('Attendance', 30, 10);
+      s.freezeRow = true;
+      s.freezeCol = true;
+      s.colWidths = { 0: 140, 1: 60, 2: 60, 3: 60, 4: 60, 5: 60, 6: 60, 7: 95 };
+      seedSheetCells(s, [
+        ['Employee Name', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Days Present'],
+        ['Rahul Sharma', '1', '1', '1', '1', '1', '1', '=SUM(B2:G2)'],
+        ['Priya Verma', '1', '1', '0', '1', '1', '1', '=SUM(B3:G3)'],
+        ['Amit Kumar', '1', '1', '1', '1', '0', '1', '=SUM(B4:G4)'],
+        ['Deepak Singh', '1', '0', '1', '1', '1', '1', '=SUM(B5:G5)']
+      ]);
+      wb.sheets.push(s);
+      return wb;
+    }
+  },
+  {
+    id: 'monthly_budget',
+    name: 'Monthly Budget Planner',
+    desc: 'Compare planned budget vs actual spending',
+    build() {
+      const wb = { id: 'wb_' + Date.now(), name: 'Monthly Budget', activeSheetIndex: 0, sheets: [] };
+      const s = createEmptySheet('Budget', 30, 10);
+      s.freezeRow = true;
+      s.colWidths = { 0: 145, 1: 110, 2: 110, 3: 110 };
+      seedSheetCells(s, [
+        ['Expense Category', 'Planned (₹)', 'Actual (₹)', 'Remaining'],
+        ['Rent & Maintenance', '12000', '12000', '=B2-C2'],
+        ['Groceries & Dining', '8000', '6850', '=B3-C3'],
+        ['Transport & Fuel', '3500', '2900', '=B4-C4'],
+        ['Utilities & Internet', '3000', '2750', '=B5-C5'],
+        ['Personal & Shopping', '4000', '4600', '=B6-C6'],
+        ['TOTAL BUDGET', '=SUM(B2:B10)', '=SUM(C2:C10)', '=B7-C7']
+      ]);
+      wb.sheets.push(s);
+      return wb;
+    }
+  },
+  {
+    id: 'blank',
+    name: 'Blank Spreadsheet',
+    desc: 'Clean empty grid ready for custom work',
+    build() {
+      const wb = { id: 'wb_' + Date.now(), name: 'Untitled Spreadsheet', activeSheetIndex: 0, sheets: [] };
+      wb.sheets.push(createEmptySheet('Sheet1', DEFAULT_ROWS, DEFAULT_COLS));
+      return wb;
+    }
+  }
+];
+
+// ==================== FORMULA ENGINE ====================
+function evaluateCell(sheet, row, col, visited = new Set()) {
+  const key = `${row}_${col}`;
+  if (visited.has(key)) return '#CYCLE!';
+  const cell = sheet.cells[key];
+  if (!cell || cell.raw === undefined || cell.raw === null || cell.raw === '') return '';
+
+  const raw = String(cell.raw).trim();
+  if (!raw.startsWith('=')) {
+    const num = Number(raw);
+    return (!isNaN(num) && raw !== '') ? num : raw;
+  }
+
+  const nextVisited = new Set(visited);
+  nextVisited.add(key);
+
+  try {
+    const expr = raw.slice(1).trim();
+    return evalFormulaExpression(sheet, expr, nextVisited);
+  } catch (err) {
+    return err.message && err.message.startsWith('#') ? err.message : '#ERROR!';
+  }
+}
+
+function expandRange(sheet, startRef, endRef, visited) {
+  const start = parseCellRef(startRef);
+  const end = parseCellRef(endRef);
+  if (!start || !end) throw new Error('#REF!');
+  const rMin = Math.min(start.row, end.row);
+  const rMax = Math.max(start.row, end.row);
+  const cMin = Math.min(start.col, end.col);
+  const cMax = Math.max(start.col, end.col);
+  const values = [];
+  for (let r = rMin; r <= rMax; r++) {
+    for (let c = cMin; c <= cMax; c++) {
+      values.push(evaluateCell(sheet, r, c, visited));
+    }
+  }
+  return values;
+}
+
+function splitArgs(argStr) {
+  const args = [];
+  let current = '';
+  let depth = 0;
+  let inQuotes = false;
+  for (let i = 0; i < argStr.length; i++) {
+    const ch = argStr[i];
+    if (ch === '"') inQuotes = !inQuotes;
+    if (!inQuotes) {
+      if (ch === '(') depth++;
+      else if (ch === ')') depth--;
+      else if (ch === ',' && depth === 0) {
+        args.push(current.trim());
+        current = '';
+        continue;
+      }
+    }
+    current += ch;
+  }
+  if (current.trim() !== '') args.push(current.trim());
+  return args;
+}
+
+function collectNumericValues(sheet, args, visited) {
+  const nums = [];
+  args.forEach((arg) => {
+    if (/^[A-Za-z]+\d+:[A-Za-z]+\d+$/.test(arg)) {
+      const [a, b] = arg.split(':');
+      expandRange(sheet, a, b, visited).forEach((v) => {
+        if (typeof v === 'number' && !isNaN(v)) nums.push(v);
+      });
+    } else {
+      const val = evalFormulaExpression(sheet, arg, visited);
+      if (typeof val === 'number' && !isNaN(val)) nums.push(val);
+    }
+  });
+  return nums;
+}
+
+function evalFormulaExpression(sheet, expr, visited) {
+  const fnMatch = /^([A-Z]+)\((.*)\)$/i.exec(expr.trim());
+  if (fnMatch) {
+    const fnName = fnMatch[1].toUpperCase();
+    const inner = fnMatch[2];
+    const args = splitArgs(inner);
+
+    if (fnName === 'SUM') {
+      const nums = collectNumericValues(sheet, args, visited);
+      return nums.reduce((a, b) => a + b, 0);
+    }
+    if (fnName === 'AVERAGE') {
+      const nums = collectNumericValues(sheet, args, visited);
+      if (nums.length === 0) return '#DIV/0!';
+      return nums.reduce((a, b) => a + b, 0) / nums.length;
+    }
+    if (fnName === 'MIN') {
+      const nums = collectNumericValues(sheet, args, visited);
+      return nums.length ? Math.min(...nums) : 0;
+    }
+    if (fnName === 'MAX') {
+      const nums = collectNumericValues(sheet, args, visited);
+      return nums.length ? Math.max(...nums) : 0;
+    }
+    if (fnName === 'COUNT') {
+      const nums = collectNumericValues(sheet, args, visited);
+      return nums.length;
+    }
+    if (fnName === 'COUNTA') {
+      let count = 0;
+      args.forEach((arg) => {
+        if (/^[A-Za-z]+\d+:[A-Za-z]+\d+$/.test(arg)) {
+          const [a, b] = arg.split(':');
+          expandRange(sheet, a, b, visited).forEach((v) => {
+            if (v !== '' && v !== null && v !== undefined) count++;
+          });
+        } else {
+          const val = evalFormulaExpression(sheet, arg, visited);
+          if (val !== '' && val !== null && val !== undefined) count++;
+        }
+      });
+      return count;
+    }
+    if (fnName === 'PRODUCT') {
+      const nums = collectNumericValues(sheet, args, visited);
+      return nums.length ? nums.reduce((a, b) => a * b, 1) : 0;
+    }
+    if (fnName === 'ROUND') {
+      if (args.length < 1 || args.length > 2) throw new Error('#ARGS!');
+      const num = Number(evalFormulaExpression(sheet, args[0], visited));
+      const digits = args[1] !== undefined ? Number(evalFormulaExpression(sheet, args[1], visited)) : 0;
+      if (isNaN(num) || isNaN(digits)) throw new Error('#VALUE!');
+      const factor = Math.pow(10, digits);
+      return Math.round(num * factor) / factor;
+    }
+    if (fnName === 'IF') {
+      if (args.length
